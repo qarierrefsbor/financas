@@ -252,8 +252,11 @@ const big=v=>{const[a,b]=Math.abs(v).toFixed(2).split('.');return`<span class="m
 function vFlx(){const s=stM(M),r=s.r,d0=T>=r.s&&T<=r.e?T:r.s;
   const col=(k,title,sum)=>{const l=CF().filter(t=>t.type==k&&inP(t,r)).sort(byDate);return`<div class="blk"><div class="bs" style="margin-top:0"><span>${title}</span><b class="v ${k}">${brl(sum)}</b><button class="add" data-add="${k}|${d0}">+ Novo</button></div>${l.map(row).join('')||'<p class="empty">Nada por aqui.</p>'}</div>`};
   return`<div class="g3"><div class="blk"><div class="ct" style="margin-bottom:8px">Resumo do mês</div><div class="mr"><span>Começa com</span><b>${brl(s.c)}</b></div><div class="mr"><span>Entradas</span><b class="in">${brl(s.i)}</b></div><div class="mr"><span>Saídas</span><b class="out">${brl(s.o)}</b></div><div class="mr tot"><span>Saldo no fim do mês</span><b${s.end<0?' class="out"':''}>${brl(s.end)}</b></div></div>${col('in','Entradas',s.i)}${col('out','Saídas',s.o)}</div>`}
+/* projeção: do dia de hoje em diante = saldo real (tudo que está marcado como pago) + pendentes até o dia escolhido; dias passados = histórico por data */
+const projAt=d=>d<T?balAt(d):CF().reduce((a,t)=>!t.paid&&t.date<=d?a+(t.type=='in'?t.value:-t.value):a,curBal());
+const pjNote=d=>{if(d<T)return'Histórico: tudo que foi lançado até esse dia';const p=Math.round((projAt(d)-curBal())*100)/100;return p==0?'Igual ao saldo hoje: nada pendente até esse dia':`Saldo hoje ${p>0?'+':'−'} ${brl(Math.abs(p))} de pendentes até esse dia`};
 function vPer(){const s=stM(M),r=s.r,nw=curBal(),tot=dim(r.y,r.m),cur=T>=r.s&&T<=r.e,dd=+T.slice(8);
-  const pdv=Math.min(pd||(cur?dd:tot),tot),pb=balAt(iso(r.y,r.m,pdv)),sob=s.i-s.o,base=Math.max(s.i,s.o,1);
+  const pdv=Math.min(pd||(cur?dd:tot),tot),pb=projAt(iso(r.y,r.m,pdv)),sob=s.i-s.o,base=Math.max(s.i,s.o,1);
   const by={};S.tx.forEach(t=>{if(t.type=='out'&&inD(ed(t),r))by[t.cat]=(by[t.cat]||0)+t.value});
   const segs=Object.entries(by).sort((a,b)=>b[1]-a[1]).map(([c,v])=>[cid(c)[1],cid(c)[2],v]);if(sob>0)segs.push(['Sobra','#17A35A',sob]);
   const bar=segs.map(x=>`<i style="flex:${x[2]};background:${x[1]}"></i>`).join('')||'<i style="flex:1;background:var(--line)"></i>';
@@ -264,7 +267,7 @@ function vPer(){const s=stM(M),r=s.r,nw=curBal(),tot=dim(r.y,r.m),cur=T>=r.s&&T<
   <div class="c a-sp"><div class="ch"><div><div class="ct">Saldo previsto</div><div class="bigr">${big(s.end)}</div><span class="pill${sob<0?' neg':''}">${sob<0?'↘ faltam '+brl(-sob):'↗ sobram '+brl(sob)} no mês</span></div><span class="ic">💰</span></div><div class="dist">${bar}</div><div class="leg">${leg}</div></div>
   <div class="c a-cp"><div class="ch"><div><div class="ct">Contas a pagar</div><div class="bigr">${big(apg)}</div><div class="sub">${npd?npd+(npd>1?' pendentes':' pendente')+' neste mês':'tudo em dia neste mês'}</div></div><span class="ic">🗓️</span></div>${list.map(row).join('')||'<p class="empty">Nenhuma saída neste mês.</p>'}</div>
   <div class="a-two"><div class="c"><div class="ch"><div><div class="ct">Saldo hoje</div><div class="bigr">${big(nw)}</div><div class="sub">considera só o que está marcado como pago</div></div><span class="ic">💵</span></div><button class="lnk" data-tab="aju">Ajustar saldo</button></div>
-  <div class="c"><div class="ch"><div class="ct">Projeção de saldo</div><small class="sub" id="pjd">dia ${pdv}/${pad(r.m+1)}</small></div><div class="pjv${pb<0?' ng2':''}" id="pjv">${brl(pb)}</div><input type="range" id="pj" min="1" max="${tot}" value="${pdv}" aria-label="Dia do mês"><div class="pjx"><span>dia 1</span><span>dia ${tot}</span></div></div></div>
+  <div class="c"><div class="ch"><div class="ct">Projeção de saldo</div><small class="sub" id="pjd">dia ${pdv}/${pad(r.m+1)}</small></div><div class="pjv${pb<0?' ng2':''}" id="pjv">${brl(pb)}</div><div class="sub" id="pjn">${pjNote(iso(r.y,r.m,pdv))}</div><input type="range" id="pj" min="1" max="${tot}" value="${pdv}" aria-label="Dia do mês"><div class="pjx"><span>dia 1</span><span>dia ${tot}</span></div></div></div>
   </div>`}
 
 const cp=v=>{const a=Math.abs(v);return(v<0?'−':'')+(a>=1000?(a/1000).toFixed(1).replace('.',',').replace(',0','')+'k':Math.round(a))};
@@ -372,7 +375,7 @@ function bk(m){bm=m;$('#bkt').textContent=m=='exp'?'Exportar backup':'Importar b
   $('#bkh').textContent=m=='exp'?'Copie este texto e guarde em um lugar privado (notas, e-mail para você, Drive). Para restaurar, use Colar texto de backup.':'Cole aqui o texto do backup.';
   $('#bkx').value=m=='exp'?JSON.stringify(S):'';$('#bkx').readOnly=m=='exp';$('#bkb').textContent=m=='exp'?'Copiar':'Importar';$('#bk').showModal();if(m=='exp')$('#bkx').select()}
 $('#bkb').onclick=()=>{const x=$('#bkx').value;if(bm=='exp'){$('#bkx').select();try{navigator.clipboard.writeText(x).then(()=>{$('#bkb').textContent='Copiado ✓'},()=>{document.execCommand('copy')})}catch(e){document.execCommand('copy')}}else if(impt(x))$('#bk').close()};
-document.addEventListener('input',e=>{if(e.target.id!='pj')return;pd=+e.target.value;const r=stM(M).r,b=balAt(iso(r.y,r.m,pd)),v=$('#pjv');$('#pjd').textContent=`dia ${pd}/${pad(r.m+1)}`;v.textContent=brl(b);v.classList.toggle('ng2',b<0)});
+document.addEventListener('input',e=>{if(e.target.id!='pj')return;pd=+e.target.value;const r=stM(M).r,b=projAt(iso(r.y,r.m,pd)),v=$('#pjv');$('#pjn').textContent=pjNote(iso(r.y,r.m,pd));$('#pjd').textContent=`dia ${pd}/${pad(r.m+1)}`;v.textContent=brl(b);v.classList.toggle('ng2',b<0)});
 let kc='',ki='',ke=null,kxc=0;
 const lum=h=>{const n=parseInt(h.slice(1),16);return(.299*(n>>16)+.587*(n>>8&255)+.114*(n&255))/255};
 function vCrt(){const cs=S.cfg.cards;
