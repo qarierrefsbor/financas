@@ -142,9 +142,13 @@ dialog[open]{animation:up .24s ease-out}
 .top{padding:8px 0 24px}
 .ov{grid-template-columns:minmax(0,2fr) minmax(0,1fr);grid-template-rows:auto auto 1fr;grid-template-areas:"sp cp" "bud cp" "two cp";align-items:start}
 }
+
+.authveil{position:fixed;inset:0;z-index:1000;background:rgba(10,12,18,.72);display:flex;align-items:center;justify-content:center;padding:20px}.authbox{width:min(420px,100%);background:var(--card);color:var(--ink);border-radius:24px;padding:24px;box-shadow:0 20px 60px rgba(0,0,0,.3)}.authbox h2{font-size:22px;margin-bottom:8px}.authbox p{color:var(--mut);margin-bottom:18px}.authbox label{display:block;font-size:13px;margin:12px 0 6px}.authbox input{width:100%;height:48px;border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:12px;padding:0 12px;font:inherit}.authbox button{width:100%;height:48px;border-radius:12px;background:var(--btn);color:white;font-weight:600;margin-top:14px}.authbox .authswitch{background:transparent;color:var(--acc);margin-top:8px}.authmsg{min-height:20px;font-size:13px;color:var(--mut);margin-top:10px}.authout{position:fixed;z-index:20;top:12px;right:12px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:8px 12px;font-size:12px;color:var(--mut)}
 </style>
 </head>
 <body>
+<div class="authveil" id="authveil"><div class="authbox"><h2 id="authhead">Entrar no Ciclo</h2><p>Seus dados serão sincronizados entre seus dispositivos.</p><form id="authform"><label for="authemail">E-mail</label><input id="authemail" type="email" autocomplete="email" required><label for="authpass">Senha</label><input id="authpass" type="password" autocomplete="current-password" minlength="8" required><button id="authsubmit" type="submit">Entrar</button></form><button class="authswitch" id="authswitch" type="button">Criar uma conta</button><div class="authmsg" id="authmsg"></div></div></div>
+<button class="authout" id="authout" hidden type="button">Sair da conta</button>
 <div class="app">
 <aside class="side"><div class="logo">Ciclo</div>
   <button class="tb" data-tab="per"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="3" width="7" height="7" rx="2"/><rect x="3" y="14" width="7" height="7" rx="2"/><rect x="14" y="14" width="7" height="7" rx="2"/></svg><span class="lg">Visão geral</span><span class="sm">Início</span></button>
@@ -204,7 +208,7 @@ let S;try{S=JSON.parse(localStorage.getItem(K))}catch(e){}
 S=S&&Array.isArray(S.tx)?S:{cfg:{opening:0},tx:[]};
 S.cfg=S.cfg||{opening:0};delete S.cfg.cycle;S.cfg.cards=S.cfg.cards||[];S.cfg.cats=S.cfg.cats||[];S.cfg.budgets=S.cfg.budgets||{};
 let _cf=null;
-const save=()=>{_cf=null;try{localStorage.setItem(K,JSON.stringify(S))}catch(e){}};
+const save=()=>{_cf=null;try{localStorage.setItem(K,JSON.stringify(S))}catch(e){};if(typeof queueCloudSave==='function')queueCloudSave()};
 const brl=v=>v.toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
 const fin=v=>v.toFixed(2).replace('.',',');
 const num=s=>{s=String(s).replace(/[^\d,.-]/g,'');if(s.includes(','))s=s.replace(/\./g,'').replace(',','.');return Math.round((parseFloat(s)||0)*100)/100};
@@ -429,6 +433,20 @@ $('#kx').onclick=()=>{if(!kxc){kxc=1;$('#kx').textContent='Toque de novo para ex
 $('#cd').addEventListener('click',e=>{if(e.target==e.currentTarget)e.currentTarget.close()});
 render();
 if('serviceWorker' in navigator)addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));
+
+// Supabase Auth + cloud sync (Ciclo)
+const CICLO_SUPABASE_URL='https://ljqeqoucziralcommecv.supabase.co';
+const CICLO_SUPABASE_KEY='sb_publishable_FPS5QYvQfxpgCD037L-qiQ_gSKOsUIl';
+let supa=null, cloudUser=null, cloudTimer=null, authMode='login', cloudBusy=false;
+function authMessage(t){$('#authmsg').textContent=t||''}
+function showAuth(){ $('#authveil').style.display='flex'; }
+function hideAuth(){ $('#authveil').style.display='none'; }
+function queueCloudSave(){if(!supa||!cloudUser||cloudBusy)return;clearTimeout(cloudTimer);cloudTimer=setTimeout(async()=>{try{await supa.from('ciclo_data').upsert({user_id:cloudUser.id,data:S,updated_at:new Date().toISOString()},{onConflict:'user_id'});}catch(e){console.warn('Ciclo cloud save failed',e)}},700)}
+async function loadCloudForUser(user){cloudUser=user;$('#authout').hidden=false;cloudBusy=true;try{const {data,error}=await supa.from('ciclo_data').select('data,updated_at').eq('user_id',user.id).maybeSingle();if(error)throw error;const localRaw=localStorage.getItem(K),local=localRaw?JSON.parse(localRaw):null,cloud=data&&data.data;
+if(cloud&&local&&Array.isArray(local.tx)&&local.tx.length&&Array.isArray(cloud.tx)&&cloud.tx.length){const useCloud=confirm('Encontramos dados neste aparelho e na nuvem. OK = usar dados da nuvem; Cancelar = manter os dados deste aparelho e enviar para a nuvem.');if(useCloud)S=cloud;else await supa.from('ciclo_data').upsert({user_id:user.id,data:S,updated_at:new Date().toISOString()},{onConflict:'user_id'});}
+else if(cloud&&Array.isArray(cloud.tx))S=cloud;else await supa.from('ciclo_data').upsert({user_id:user.id,data:S,updated_at:new Date().toISOString()},{onConflict:'user_id'});localStorage.setItem(K,JSON.stringify(S));render();}catch(e){authMessage('Não foi possível sincronizar: '+(e.message||e));console.error(e)}finally{cloudBusy=false}}
+async function initCicloAuth(){$('#authout').onclick=async()=>{await supa.auth.signOut()};if(!window.supabase){authMessage('Falha ao carregar serviço de autenticação. Recarregue a página.');return}supa=window.supabase.createClient(CICLO_SUPABASE_URL,CICLO_SUPABASE_KEY);$('#authswitch').onclick=()=>{authMode=authMode==='login'?'signup':'login';$('#authhead').textContent=authMode==='login'?'Entrar no Ciclo':'Criar conta no Ciclo';$('#authsubmit').textContent=authMode==='login'?'Entrar':'Cadastrar';$('#authswitch').textContent=authMode==='login'?'Criar uma conta':'Já tenho conta';$('#authpass').autocomplete=authMode==='login'?'current-password':'new-password';authMessage('')};$('#authform').onsubmit=async e=>{e.preventDefault();authMessage('Aguarde...');const email=$('#authemail').value.trim(),password=$('#authpass').value;let r=authMode==='login'?await supa.auth.signInWithPassword({email,password}):await supa.auth.signUp({email,password});if(r.error){authMessage(r.error.message);return}if(authMode==='signup'&&!r.data.session){authMessage('Cadastro criado. Verifique seu e-mail para confirmar a conta.');return}if(r.data.user){await loadCloudForUser(r.data.user);hideAuth()}};const {data}=await supa.auth.getSession();if(data.session?.user){await loadCloudForUser(data.session.user);hideAuth()}else showAuth();supa.auth.onAuthStateChange(async(event,session)=>{if(event==='SIGNED_OUT'){cloudUser=null;$('#authout').hidden=true;showAuth()}else if(event==='SIGNED_IN'&&session?.user&&!cloudUser){await loadCloudForUser(session.user);hideAuth()}})}
+const authLib=document.createElement('script');authLib.src='https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2';authLib.onload=initCicloAuth;authLib.onerror=()=>authMessage('Não foi possível carregar o Supabase JS.');document.head.appendChild(authLib);
 </script>
 </body>
 </html>
