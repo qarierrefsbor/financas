@@ -20,6 +20,7 @@
 --bg:#F4F4F7;--card:#fff;--ink:#16161F;--mut:#6F6F82;--line:#ECECF2;--ck:#C4C5D2;--acc:#2B5BE6;--btn:#2B5BE6;--soft:#EAF0FF;--in:#17A35A;--out:#E5446D;color-scheme:light}
 @media(prefers-color-scheme:dark){:root{--bg:#0E1016;--card:#171A23;--ink:#F2F3F8;--mut:#9094AA;--line:#262A37;--ck:#4A4E60;--acc:#6B8FFF;--soft:#1E2742;--in:#3DD68C;--out:#FF7A9C;color-scheme:dark}}
 @media(min-width:600px){:root{--pad:24px;--gap:24px}}
+@media(min-width:760px){.a-today{grid-template-columns:1fr 1fr}}
 *{box-sizing:border-box;margin:0}
 [hidden]{display:none!important}
 html{-webkit-tap-highlight-color:transparent}
@@ -40,8 +41,9 @@ button{padding:0;font:inherit;color:inherit;background:none;border:0;cursor:poin
 #ttl{font-size:24px;line-height:32px;font-weight:700;letter-spacing:-.02em}
 #pl{height:40px;white-space:nowrap;font-size:24px;line-height:32px;font-weight:700;letter-spacing:-.02em}#pl span{color:var(--mut);font-weight:500}
 .addb{margin-left:auto;display:flex;align-items:center;justify-content:center;flex:none;width:40px;height:40px;border-radius:16px;background:var(--btn);color:#fff;font-size:24px;line-height:24px;font-weight:500;white-space:nowrap}.addb .al{display:none}
-.ov{display:grid;gap:var(--gap);grid-template-areas:"sp" "bud" "cp" "two"}
-.a-sp{grid-area:sp}.a-bud{grid-area:bud}.a-cp{grid-area:cp}.a-two{grid-area:two;display:grid;gap:var(--gap);grid-template-columns:1fr}
+.ov{display:grid;gap:var(--gap);grid-template-columns:1fr}
+.ov-col{display:grid;align-content:start;gap:var(--gap);min-width:0}.ov-col{display:contents}
+.a-today{display:grid;gap:var(--gap);grid-template-columns:1fr;order:1}.a-early,.a-sp,.a-bud,.a-cp{min-width:0}.a-early{order:2}.a-cp{order:3}.a-bud{order:4}
 .g3{display:grid;gap:var(--gap);grid-template-columns:repeat(auto-fit,minmax(304px,1fr))}
 #v-gra{display:grid;gap:var(--gap);grid-template-columns:repeat(auto-fit,minmax(320px,1fr));align-items:start}
 #v-aju{max-width:560px}#v-aju .card{margin-bottom:var(--gap)}
@@ -140,7 +142,7 @@ dialog[open]{animation:up .24s ease-out}
 .tb[aria-current=page]{background:var(--bg);color:var(--ink);font-weight:600}
 .mainc{width:100%;max-width:none;padding:0 0 32px 24px}
 .top{padding:8px 0 24px}
-.ov{grid-template-columns:minmax(0,2fr) minmax(0,1fr);grid-template-rows:auto auto 1fr;grid-template-areas:"sp cp" "bud cp" "two cp";align-items:start}
+.ov{grid-template-columns:minmax(0,1fr) minmax(0,1fr);align-items:start}.ov-col{display:grid;align-content:start;gap:var(--gap)}
 }
 
 /* Auth como tela independente: nenhum dado do app fica visível antes da sessão. */
@@ -293,6 +295,18 @@ const spent=(cat,mi)=>S.tx.filter(t=>t.type=='out'&&t.cat==cat&&spM(t)==mi).redu
 function consumeProvision(cat,date,amount){let cents=Math.round(amount*100);const future=S.tx.filter(t=>t.type=='out'&&t.cat==cat&&!t.paid&&t.date>date&&!t.card).sort((a,b)=>a.date.localeCompare(b.date));for(const t of future){if(cents<=0)break;const available=Math.round((+t.value||0)*100),take=Math.min(available,cents);cents-=take;const remain=available-take;if(remain<=0)S.tx=S.tx.filter(x=>x.id!==t.id);else t.value=remain/100;}return amount-cents/100}
 function toast(msg,undo){clearTimeout(window._tt);const el=$('#ts');el.innerHTML=`<span>${esc(msg)}</span><button data-a="undo">Desfazer</button>`;el.hidden=false;window._undo=undo;window._tt=setTimeout(()=>{el.hidden=true;window._undo=null},8000)}
 const fmtPa=ms=>{const d=new Date(ms),k=iso(d.getFullYear(),d.getMonth(),d.getDate());return(k==T?'hoje':pad(d.getDate())+'/'+pad(d.getMonth()+1))+' '+pad(d.getHours())+':'+pad(d.getMinutes())};
+function earlyWindow(){
+  const [cy,cm,cd]=T.split('-').map(Number),base=cy*12+(cm-1),start=cd>14?base+1:base;
+  const months=[];
+  for(let k=0;k<4;k++){
+    const mi=start+k,y=Math.floor(mi/12),m=mi-y*12,days=dim(y,m),d10=Math.min(10,days),d14=Math.min(14,days);
+    const b10=projAt(iso(y,m,d10)),vals=[];
+    for(let d=d10;d<=d14;d++)vals.push(projAt(iso(y,m,d)));
+    const minv=Math.min(...vals),minDay=d10+vals.indexOf(minv);
+    months.push({label:MESL[m]+' '+y,day10:b10,minv,minDay});
+  }
+  return `<div class="ct">Visão antecipada</div><div class="sub" style="margin:4px 0 12px">Saldo previsto no dia 10 e menor saldo entre os dias 10 e 14</div>${months.map(x=>`<div class="mr"><span><b>${x.label}</b><small class="sub" style="display:block">Dia 10 · mínimo dia ${x.minDay}</small></span><b class="${x.minv<0?'out':''}">${brl(x.day10)}<small class="sub" style="display:block">${brl(x.minv)} mínimo</small></b></div>`).join('')}<div class="hint">Atenção especial à janela antes do recebimento do vale, dia 15.</div>`;
+}
 function vPer(){const s=stM(M),r=s.r,nw=curBal(),tot=dim(r.y,r.m),cur=T>=r.s&&T<=r.e,dd=+T.slice(8);
   const pdv=Math.min(pd||(cur?dd:tot),tot),pb=projAt(iso(r.y,r.m,pdv)),sob=s.i-s.o,base=Math.max(s.i,s.o,1);
   const by={};S.tx.forEach(t=>{if(t.type=='out'&&inD(ed(t),r))by[t.cat]=(by[t.cat]||0)+t.value});
@@ -305,11 +319,10 @@ function vPer(){const s=stM(M),r=s.r,nw=curBal(),tot=dim(r.y,r.m),cur=T>=r.s&&T<
   const tb=bgs.reduce((a,x)=>a+x.b,0),ts=bgs.reduce((a,x)=>a+x.sp,0);
   const budH=bgs.length?`<div class="ch"><div class="ct">Orçamento do mês</div><button class="lnk" data-tab="aju">Editar</button></div><div class="sub">${brl(ts)} de ${brl(tb)} nas categorias com limite</div>${bgs.map(x=>`<div class="bgr"><div class="bgh"><span class="bgn"><i style="background:${x.c[2]}"></i>${esc(x.c[1])}</span><b>${brl(x.sp)} <small>de ${brl(x.b)}</small></b></div><div class="bar"><i class="${x.pc>100?'o':x.pc>=80?'w':''}" style="width:${Math.min(100,x.pc)}%"></i></div><div class="sub">${x.sp>x.b?'Estourou '+brl(x.sp-x.b):'Restam '+brl(x.b-x.sp)} · ${x.pc}%</div></div>`).join('')}`:`<div class="ct">Orçamento do mês</div><p class="sub" style="margin:8px 0 16px">Defina quanto quer gastar por mês em cada categoria, como mercado e lazer, e acompanhe aqui.</p><button class="lnk" data-tab="aju">Definir orçamentos</button>`;
   return`${ob}<div class="ov">
-  <div class="c a-sp"><div class="ch"><div><div class="ct">Saldo previsto</div><div class="bigr">${big(s.end)}</div><span class="pill${sob<0?' neg':''}">${sob<0?'↘ faltam '+brl(-sob):'↗ sobram '+brl(sob)} no mês</span></div><span class="ic">💰</span></div><div class="dist">${bar}</div><div class="leg">${leg}</div></div>
-  <div class="c a-bud">${budH}</div>
-  <div class="c a-cp"><div class="ch"><div><div class="ct">Contas a pagar</div><div class="bigr">${big(apg)}</div><div class="sub">${npd?npd+(npd>1?' pendentes':' pendente')+' neste mês':'tudo em dia neste mês'}</div></div><span class="ic">🗓️</span></div>${list.map(row).join('')||'<p class="empty">Nenhuma saída neste mês.</p>'}</div>
-  <div class="a-two"><div class="c"><div class="ch"><div><div class="ct">Saldo hoje</div><div class="bigr">${big(nw)}</div><div class="sub">considera só o que está marcado como pago</div></div><span class="ic">💵</span></div><button class="lnk" data-tab="aju">Ajustar saldo</button></div>
-  <div class="c"><div class="ch"><div class="ct">Projeção de saldo</div><small class="sub" id="pjd">dia ${pdv}/${pad(r.m+1)}</small></div><div class="pjv${pb<0?' ng2':''}" id="pjv">${brl(pb)}</div><div class="sub" id="pjn">${pjNote(iso(r.y,r.m,pdv))}</div><input type="range" id="pj" min="1" max="${tot}" value="${pdv}" aria-label="Dia do mês"><div class="pjx"><span>dia 1</span><span>dia ${tot}</span></div></div></div>
+  <div class="ov-col"><div class="c a-today"><div class="ch"><div><div class="ct">Saldo hoje</div><div class="bigr">${big(nw)}</div><div class="sub">considera só o que está marcado como pago</div></div><span class="ic">💵</span></div><button class="lnk" data-tab="aju">Ajustar saldo</button></div>
+  <div class="c a-cp"><div class="ch"><div><div class="ct">Contas a pagar</div><div class="bigr">${big(apg)}</div><div class="sub">${npd?npd+(npd>1?' pendentes':' pendente')+' neste mês':'tudo em dia neste mês'}</div></div><span class="ic">🗓️</span></div>${list.map(row).join('')||'<p class="empty">Nenhuma saída neste mês.</p>'}</div></div>
+  <div class="ov-col"><div class="c a-early">${earlyWindow()}<div class="divider" style="margin:16px 0"></div><div class="ch"><div class="ct">Projeção de saldo</div><small class="sub" id="pjd">dia ${pdv}/${pad(r.m+1)}</small></div><div class="pjv${pb<0?' ng2':''}" id="pjv">${brl(pb)}</div><div class="sub" id="pjn">${pjNote(iso(r.y,r.m,pdv))}</div><input type="range" id="pj" min="1" max="${tot}" value="${pdv}" aria-label="Dia do mês"><div class="pjx"><span>dia 1</span><span>dia ${tot}</span></div><div class="ch" style="margin-top:16px"><div><div class="ct">Saldo previsto</div><div class="bigr">${big(s.end)}</div><span class="pill${sob<0?' neg':''}">${sob<0?'↘ faltam '+brl(-sob):'↗ sobram '+brl(sob)} no mês</span></div><span class="ic">💰</span></div><div class="dist">${bar}</div><div class="leg">${leg}</div></div>
+  <div class="c a-bud">${budH}</div></div>
   </div>`}
 
 const cp=v=>{const a=Math.abs(v);return(v<0?'−':'')+(a>=1000?(a/1000).toFixed(1).replace('.',',').replace(',0','')+'k':Math.round(a))};
