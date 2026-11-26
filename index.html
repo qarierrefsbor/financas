@@ -163,6 +163,14 @@ body:not(.authenticated) .app{display:none!important}
 
 .syncnotice{position:fixed;z-index:30;left:50%;bottom:16px;transform:translateX(-50%);width:min(560px,calc(100% - 24px));display:flex;align-items:center;gap:12px;justify-content:space-between;padding:12px 14px;border:1px solid var(--line);border-radius:16px;background:var(--card);box-shadow:0 8px 28px rgba(0,0,0,.12);font-size:13px;color:var(--ink)}.syncnotice[hidden]{display:none}.syncactions{display:flex;gap:8px;flex:none}.syncactions button{border:0;border-radius:10px;padding:8px 10px;font:inherit;font-weight:600;cursor:pointer}.syncactions #syncnow{background:var(--btn);color:#fff}.syncactions #syncdismiss{background:var(--soft);color:var(--mut)}@media(max-width:520px){.syncnotice{align-items:flex-start;flex-direction:column}.syncactions{width:100%}.syncactions button{flex:1}}
 @media(max-width:480px){.authbox{padding:24px;border-radius:20px}.authbrand{margin-bottom:24px}}
+
+.early-values{display:block;text-align:right;flex:none;margin-left:auto;min-width:152px;font-variant-numeric:tabular-nums}
+.early-values small{text-align:right;font-weight:500}
+.early-row>span{min-width:0}
+.early-nav{display:flex;align-items:center;justify-content:center;gap:12px;margin-top:8px}
+.early-nav button{width:36px;height:36px;border-radius:12px;background:var(--soft);color:var(--acc);font-size:24px;line-height:32px;font-weight:600}
+.early-nav button:disabled{opacity:.35;cursor:default}
+
 </style>
 </head>
 <body>
@@ -262,7 +270,7 @@ function st(n){const r=pR(n);let c=S.cfg.opening,cp=c,i=0,o=0,pi=0,po=0;
 
 const MESL=['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
 const M0=td.getFullYear()*12+td.getMonth();
-let M=M0,pd=0,tab='per',ty='out',eid=null;
+let M=M0,pd=0,tab='per',ty='out',eid=null,earlyPage=0;
 function stM(mi){const y=Math.floor(mi/12),m=mi-y*12,a=pIdx(iso(y,m,1)),b=pIdx(iso(y,m,dim(y,m)));let i=0,o=0,po=0;
   for(let n=a;n<=b;n++){const q=st(n);i+=q.i;o+=q.o;po+=q.po}
   const f=st(a),l=st(b);return{r:{y,m,s:iso(y,m,1),e:iso(y,m,dim(y,m))},a,b,c:f.c,i,o,po,end:l.end,real:l.real}}
@@ -283,8 +291,9 @@ const balAt=d=>CF().reduce((a,t)=>t.date<=d?a+(t.type=='in'?t.value:-t.value):a,
 const curBal=()=>CF().reduce((a,t)=>t.paid?a+(t.type=='in'?t.value:-t.value):a,S.cfg.opening);
 const big=v=>{const[a,b]=Math.abs(v).toFixed(2).split('.');return`<span class="mm">${v<0?'−':''}<small>R$</small> ${(+a).toLocaleString('pt-BR')}<small>,${b}</small></span>`};
 function vFlx(){const s=stM(M),r=s.r,d0=T>=r.s&&T<=r.e?T:r.s;
-  const col=(k,title,sum)=>{const l=CF().filter(t=>t.type==k&&inP(t,r)).sort(byDate);return`<div class="blk"><div class="bs" style="margin-top:0"><span>${title}</span><b class="v ${k}">${brl(sum)}</b><button class="add" data-add="${k}|${d0}">+ Novo</button></div>${l.map(row).join('')||'<p class="empty">Nada por aqui.</p>'}</div>`};
-  return`<div class="g3"><div class="blk"><div class="ct" style="margin-bottom:8px">Resumo do mês</div><div class="mr"><span>Começa com</span><b>${brl(s.c)}</b></div><div class="mr"><span>Entradas</span><b class="in">${brl(s.i)}</b></div><div class="mr"><span>Saídas</span><b class="out">${brl(s.o)}</b></div><div class="mr tot"><span>Saldo no fim do mês</span><b${s.end<0?' class="out"':''}>${brl(s.end)}</b></div></div>${col('in','Entradas',s.i)}${col('out','Saídas',s.o)}</div>`}
+  const col=(k,title,sum)=>{const l=CF().filter(t=>t.type==k&&inP(t,r)&&(k!='out'||!t.paid)).sort(byDate);return`<div class="blk"><div class="bs" style="margin-top:0"><span>${title}</span><b class="v ${k}">${brl(sum)}</b><button class="add" data-add="${k}|${d0}">+ Novo</button></div>${l.map(row).join('')||'<p class="empty">Nada por aqui.</p>'}</div>`};
+  const paidOut=CF().filter(t=>t.type=='out'&&t.paid&&inP(t,r)).sort(byDate),paidTotal=paidOut.reduce((a,t)=>a+t.value,0);
+  return`<div class="g3"><div class="blk"><div class="ct" style="margin-bottom:8px">Resumo do mês</div><div class="mr"><span>Começa com</span><b>${brl(s.c)}</b></div><div class="mr"><span>Entradas</span><b class="in">${brl(s.i)}</b></div><div class="mr"><span>Saídas</span><b class="out">${brl(s.o)}</b></div><div class="mr tot"><span>Saldo no fim do mês</span><b${s.end<0?' class="out"':''}>${brl(s.end)}</b></div></div>${col('in','Entradas',s.i)}${col('out','Saídas pendentes',Math.round((s.o-s.po)*100)/100)}<div class="blk"><div class="bs" style="margin-top:0"><span>Contas pagas</span><b class="v out">${brl(paidTotal)}</b></div>${paidOut.map(row).join('')||'<p class="empty">Nenhuma conta paga neste mês.</p>'}</div></div>`}
 /* projeção: do dia de hoje em diante = saldo real (tudo que está marcado como pago) + pendentes até o dia escolhido; dias passados = histórico por data */
 const projAt=d=>d<T?balAt(d):CF().reduce((a,t)=>!t.paid&&t.date<=d?a+(t.type=='in'?t.value:-t.value):a,curBal());
 const pjNote=d=>{if(d<T)return'Histórico: tudo que foi lançado até esse dia';const p=Math.round((projAt(d)-curBal())*100)/100;return p==0?'Igual ao saldo hoje: nada pendente até esse dia':`Saldo hoje ${p>0?'+':'−'} ${brl(Math.abs(p))} de pendentes até esse dia`};
@@ -299,13 +308,14 @@ function earlyWindow(){
   const [cy,cm,cd]=T.split('-').map(Number),base=cy*12+(cm-1),start=cd>14?base+1:base;
   const months=[];
   for(let k=0;k<4;k++){
-    const mi=start+k,y=Math.floor(mi/12),m=mi-y*12,days=dim(y,m),d10=Math.min(10,days),d14=Math.min(14,days);
+    const mi=start+earlyPage*4+k,y=Math.floor(mi/12),m=mi-y*12,days=dim(y,m),d10=Math.min(10,days),d14=Math.min(14,days);
     const b10=projAt(iso(y,m,d10)),vals=[];
     for(let d=d10;d<=d14;d++)vals.push(projAt(iso(y,m,d)));
     const minv=Math.min(...vals),minDay=d10+vals.indexOf(minv);
     months.push({label:MESL[m]+' '+y,day10:b10,minv,minDay});
   }
-  return `<div class="ct">Visão antecipada</div><div class="sub" style="margin:4px 0 12px">Saldo previsto no dia 10 e menor saldo entre os dias 10 e 14</div>${months.map(x=>`<div class="mr"><span><b>${x.label}</b><small class="sub" style="display:block">Dia 10 · mínimo dia ${x.minDay}</small></span><b class="${x.minv<0?'out':''}">${brl(x.day10)}<small class="sub" style="display:block">${brl(x.minv)} mínimo</small></b></div>`).join('')}<div class="hint">Atenção especial à janela antes do recebimento do vale, dia 15.</div>`;
+  const range=`${months[0].label} – ${months[3].label}`;
+  return `<div class="ct">Visão antecipada</div><div class="sub" style="margin:4px 0 12px">Saldo previsto no dia 10 e menor saldo entre os dias 10 e 14</div>${months.map(x=>`<div class="mr early-row"><span><b>${x.label}</b><small class="sub" style="display:block">Dia 10 · mínimo dia ${x.minDay}</small></span><b class="early-values ${x.minv<0?'out':''}">${brl(x.day10)}<small class="sub" style="display:block">${brl(x.minv)} mínimo</small></b></div>`).join('')}<div class="hint">Atenção especial à janela antes do recebimento do vale, dia 15.</div><div class="early-nav"><button data-early-page="-1" ${earlyPage===0?'disabled':''} aria-label="Meses anteriores">‹</button><span class="sub">${range}</span><button data-early-page="1" aria-label="Próximos quatro meses">›</button></div>`;
 }
 function vPer(){const s=stM(M),r=s.r,nw=curBal(),tot=dim(r.y,r.m),cur=T>=r.s&&T<=r.e,dd=+T.slice(8);
   const pdv=Math.min(pd||(cur?dd:tot),tot),pb=projAt(iso(r.y,r.m,pdv)),sob=s.i-s.o,base=Math.max(s.i,s.o,1);
@@ -313,7 +323,7 @@ function vPer(){const s=stM(M),r=s.r,nw=curBal(),tot=dim(r.y,r.m),cur=T>=r.s&&T<
   const segs=Object.entries(by).sort((a,b)=>b[1]-a[1]).map(([c,v])=>[cid(c)[1],cid(c)[2],v]);if(sob>0)segs.push(['Sobra','#17A35A',sob]);
   const bar=segs.map(x=>`<i style="flex:${x[2]};background:${x[1]}"></i>`).join('')||'<i style="flex:1;background:var(--line)"></i>';
   const leg=segs.map(x=>`<div><small><i style="background:${x[1]}"></i>${x[0]}</small><b>${brl(x[2])}</b><em>${Math.round(x[2]/base*100)}%</em></div>`).join('');
-  const npd=CF().filter(t=>t.type=='out'&&!t.paid&&inP(t,r)).length,apg=s.o-s.po,list=CF().filter(t=>t.type=='out'&&inP(t,r)).sort((a,b)=>(a.paid-b.paid)||byDate(a,b));
+  const npd=CF().filter(t=>t.type=='out'&&!t.paid&&inP(t,r)).length,apg=s.o-s.po,list=CF().filter(t=>t.type=='out'&&!t.paid&&inP(t,r)).sort(byDate);
   const ob=!S.tx.length?`<div class="ob"><h2>Comece por aqui</h2><p>Informe quanto você tem hoje em conta e adicione o primeiro lançamento. Cada mês começa com o saldo final do anterior.</p><div class="btns"><button data-tab="aju">Definir saldo da conta</button><button data-a="new">Adicionar lançamento</button></div></div>`:'';
   const bgs=catsOf('out').filter(c=>S.cfg.budgets[c[0]]>0).map(c=>{const b=S.cfg.budgets[c[0]],sp=Math.round(spent(c[0],M)*100)/100;return{c,b,sp,pc:Math.round(sp/b*100)}}).sort((a,b)=>b.pc-a.pc);
   const tb=bgs.reduce((a,x)=>a+x.b,0),ts=bgs.reduce((a,x)=>a+x.sp,0);
@@ -389,8 +399,9 @@ $('#del').onclick=()=>{const t=S.tx.find(x=>x.id==eid),ids=new Set([t.id]);if($(
 $('#sh').addEventListener('click',e=>{if(e.target==e.currentTarget)e.currentTarget.close()});
 $('#pv').onclick=()=>{M--;pd=0;render()};$('#pn').onclick=()=>{M++;pd=0;render()};$('#pl').onclick=()=>{M=M0;pd=0;render()};
 
-document.addEventListener('click',e=>{const b=e.target.closest('[data-tab],[data-ck],[data-ed],[data-a],[data-ty],[data-add],[data-kc],[data-ki],[data-sw],[data-cx]');if(!b)return;const d=b.dataset;
+document.addEventListener('click',e=>{const b=e.target.closest('[data-tab],[data-ck],[data-ed],[data-a],[data-ty],[data-add],[data-kc],[data-ki],[data-sw],[data-cx],[data-early-page]');if(!b)return;const d=b.dataset;
   if(d.tab){tab=d.tab;render();scrollTo(0,0)}
+  else if(d.earlyPage!=null){earlyPage=Math.max(0,earlyPage+(+d.earlyPage));render()}
   else if(d.ck){const t=S.tx.find(x=>x.id==d.ck)||CF().find(x=>x.id==d.ck),its=t.inv?t.items:[t],nv=!t.paid,prev=its.map(i=>[i,i.paid,i.pa]);
     its.forEach(i=>{i.paid=nv;if(nv)i.pa=Date.now();else delete i.pa});save();render();
     toast(`${t.desc} · ${brl(t.value)} ${nv?'marcada como paga':'voltou para pendente'}`,()=>{prev.forEach(([i,p,a])=>{i.paid=p;if(a)i.pa=a;else delete i.pa});save();render()})}
